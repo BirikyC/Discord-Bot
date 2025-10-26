@@ -16,8 +16,8 @@ const client = new Client({
 const TOKEN = process.env.TOKEN;
 const CHANNEL_ID = process.env.CHANNEL_ID;
 
-const MESSAGE = 'Szuszekcwel';
-const INTERVAL = 1 * 60 * 1000; // co 1 minute
+const MESSAGE = 'Szuszekcwel poraz';
+const INTERVAL = 5 * 60 * 1000; // co 5 minut
 
 function read_counter() {
   try {
@@ -45,7 +45,7 @@ client.once('ready', () => {
 
   const sendMessage = () => {
     counter++;
-    channel.send(`${MESSAGE} (${counter})`);
+    channel.send(`${MESSAGE} ${counter}.`);
     write_counter(counter);
   };
 
