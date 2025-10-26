@@ -17,7 +17,7 @@ const TOKEN = process.env.TOKEN;
 const CHANNEL_ID = process.env.CHANNEL_ID;
 
 const MESSAGE = 'Szuszekcwel';
-const INTERVAL = 15 * 60 * 1000; // co 15 minut
+const INTERVAL = 1 * 60 * 1000; // co 1 minute
 
 function read_counter() {
   try {
