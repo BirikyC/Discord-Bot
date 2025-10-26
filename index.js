@@ -1,4 +1,5 @@
 const { Client, GatewayIntentBits } = require('discord.js');
+const fs = require('fs');
 require('dotenv').config();
 
 const client = new Client({
@@ -11,6 +12,21 @@ const CHANNEL_ID = process.env.CHANNEL_ID;
 const MESSAGE = 'Szuszekcwel';
 const INTERVAL = 15 * 60 * 1000; // co 15 minut
 
+function read_counter() {
+  try {
+    const data = fs.readFileSync('counter.json', 'utf8');
+    return JSON.parse(data).count || 0;
+  } catch (err) {
+    return 0;
+  }
+}
+
+function write_counter(count) {
+  fs.writeFileSync('counter.json', JSON.stringify({ count }));
+}
+
+let counter = read_counter();
+
 client.once('ready', () => {
   console.log(`✅ Zalogowano jako ${client.user.tag}!`);
 
@@ -20,11 +36,17 @@ client.once('ready', () => {
     return;
   }
 
-  channel.send(MESSAGE);
+  const sendMessage = () => {
+    counter++;
+    channel.send(`${MESSAGE} (${counter})`);
+    writeCounter(counter);
+  };
 
-  setInterval(() => {
-    channel.send(MESSAGE);
-  }, INTERVAL);
+  // na starcie wyslanie wiadomosci
+  sendMessage();
+
+  // cykliczne wysylanie wiadomosci
+  setInterval(sendMessage, INTERVAL);
 });
 
 client.login(TOKEN);
