@@ -46,7 +46,7 @@ client.once('ready', () => {
   const sendMessage = () => {
     counter++;
     channel.send(`${MESSAGE} (${counter})`);
-    writeCounter(counter);
+    write_counter(counter);
   };
 
   // na starcie wyslanie wiadomosci
