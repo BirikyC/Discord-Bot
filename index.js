@@ -2,6 +2,13 @@ const { Client, GatewayIntentBits } = require('discord.js');
 const fs = require('fs');
 require('dotenv').config();
 
+const express = require('express');
+const app = express();
+const PORT = process.env.PORT || 10000;
+
+app.get('/', (req, res) => res.send('Bot działa!'));
+app.listen(PORT, () => console.log(`Server nasłuchuje na porcie ${PORT}`));
+
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages]
 });
