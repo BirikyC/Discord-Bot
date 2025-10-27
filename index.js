@@ -17,7 +17,8 @@ const TOKEN = process.env.TOKEN;
 const CHANNEL_ID = process.env.CHANNEL_ID;
 
 const MESSAGE = 'Szuszekcwel poraz';
-const INTERVAL = 5 * 60 * 1000; // co 5 minut
+const SPECIAL_MESSAGE = 'Szuszek ale on ma Gyatt.';
+const INTERVAL = 60 * 60 * 1000; // co godzine
 
 function read_counter() {
   try {
@@ -46,14 +47,27 @@ client.once('ready', () => {
   const sendMessage = () => {
     counter++;
     channel.send(`${MESSAGE} ${counter}.`);
+    
+    if(counter % 100 == 0) channel.send(`${SPECIAL_MESSAGE}`);
+      
     write_counter(counter);
   };
 
-  // na starcie wyslanie wiadomosci
-  sendMessage();
+  // zmienna nextFullHour: oznacza następna pełna godzina (np. 21:00, 22:00, itd.)
+  const now = new Date();
+  const nextFullHour = new Date(now);
+  nextFullHour.setMinutes(0, 0, 0);
+  nextFullHour.setHours(nextFullHour.getHours() + 1);
 
-  // cykliczne wysylanie wiadomosci
-  setInterval(sendMessage, INTERVAL);
+  const msUntilNextFullHour = nextFullHour - now;
+  console.log(`Pierwsza wiadomosc nastapi za ${Math.round(msUntilNextFullHour / 1000)} sekund.`);
+
+  setTimeout(() => {
+    sendMessage();
+
+    // cykliczne (co godzine) wysylanie wiadomosci
+    setInterval(sendMessage, INTERVAL);
+  }, msUntilNextFullHour);
 });
 
 client.login(TOKEN);
