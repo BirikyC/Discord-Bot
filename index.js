@@ -16,6 +16,7 @@ const client = new Client({
 
 const TOKEN = process.env.TOKEN;
 const CHANNEL_ID = process.env.CHANNEL_ID;
+const GUILD_ID = process.env.GUILD_ID;
 
 const MESSAGE = 'Szuszekcwel poraz';
 const SPECIAL_MESSAGE = 'Szuszek ale on ma Gyatt.';
@@ -39,6 +40,24 @@ let counter = read_counter();
 client.once('clientReady', () => {
   console.log(`Zalogowano jako ${client.user.tag}!`);
 
+  // ===== Rejestracja komend =====
+  (async () => {
+    try {
+      console.log('Rejestrowanie komend...');
+
+      const rest = new REST({ version: '10' }).setToken(TOKEN);
+      await rest.put(
+        Routes.applicationGuildCommands(client.user.id, GUILD_ID),
+        { body: commands }
+      );
+
+      console.log('Komendy zarejestrowane!');
+    } catch (err) {
+      console.error('Błąd przy rejestracji komend:', err);
+    }
+  })();
+
+  // ===== Cykliczne wysylanie wiadomosci co godzine =====
   const channel = client.channels.cache.get(CHANNEL_ID);
   if (!channel) {
     console.error('Nie znaleziono kanału! Sprawdź ID.');
@@ -85,22 +104,6 @@ const commands = [
     .setDescription('Szuszek ale on ma gyatt 🗿.')
 ].map(cmd => cmd.toJSON());
 
-const rest = new REST({ version: '10' }).setToken(TOKEN);
-
-client.once('clientReady', () => {
-  (async () => {
-    try {
-      console.log('Rejestrowanie komend...');
-
-      await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
-
-      console.log('Komendy zarejestrowane!');
-    } catch (err) {
-      console.error('Błąd przy rejestracji komend:', err);
-    }
-  })();
-})
-
 client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
 
@@ -121,7 +124,7 @@ client.on('interactionCreate', async interaction => {
 
     await interaction.reply({
       content: `Szuszek ale on ma Gyatt.`,
-      files: attachment
+      files: [attachment]
     });
   }
 });
