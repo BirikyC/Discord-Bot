@@ -1,5 +1,6 @@
 const { Client, GatewayIntentBits } = require('discord.js');
 const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
 
 const express = require('express');
@@ -10,7 +11,7 @@ app.get('/', (req, res) => res.send('Bot działa!'));
 app.listen(PORT, () => console.log(`Server nasłuchuje na porcie ${PORT}`));
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages]
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent]
 });
 
 const TOKEN = process.env.TOKEN;
@@ -71,3 +72,55 @@ client.once('ready', () => {
 });
 
 client.login(TOKEN);
+
+
+/* 
+********************************* PONIŻEJ SKRYPT Z KOMENDAMI DLA BOTA *********************************
+*/
+
+const { REST, Routes, SlashCommandBuilder, AttachmentBuilder } = require('discord.js');
+
+const commands = [
+  new SlashCommandBuilder()
+    .setName('gyatt')
+    .setDescription('Szuszek ale on ma gyatt 🗿.')
+].map(cmd => cmd.toJSON());
+
+const rest = new REST({ version: '10' }).setToken(TOKEN);
+
+(async () => {
+  try {
+    console.log('Rejestrowanie komend...');
+
+    await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
+
+    console.log('Komendy zarejestrowane!');
+  } catch (err) {
+    console.error('Błąd przy rejestracji komend:', err);
+  }
+})();
+
+client.on('interactionCreate', async interaction => {
+  if (!interaction.isChatInputCommand()) return;
+
+  if (interaction.commandName === 'gyatt') {
+    const GIFS_PATH = './img/gyatts';
+
+    const gifs = fs.readdirSync(GIFS_PATH).filter(file => file.endsWith('.gif'));
+
+    if (gifs.length === 0) {
+      await interaction.reply('Brak plików GIF w folderze!');
+      return;
+    }
+
+    const random_gif = gifs[Math.floor(Math.random() * gifs.length)];
+    const gif_path = path.join(GIFS_PATH, random_gif);
+
+    const attachment = new AttachmentBuilder(gif_path);
+
+    await interaction.reply({
+      content: `Szuszek ale on ma Gyatt.`,
+      files: attachment
+    });
+  }
+});
