@@ -36,7 +36,7 @@ function write_counter(count) {
 
 let counter = read_counter();
 
-client.once('ready', () => {
+client.once('clientReady', () => {
   console.log(`Zalogowano jako ${client.user.tag}!`);
 
   const channel = client.channels.cache.get(CHANNEL_ID);
@@ -73,7 +73,6 @@ client.once('ready', () => {
 
 client.login(TOKEN);
 
-
 /* 
 ********************************* PONIŻEJ SKRYPT Z KOMENDAMI DLA BOTA *********************************
 */
@@ -88,17 +87,19 @@ const commands = [
 
 const rest = new REST({ version: '10' }).setToken(TOKEN);
 
-(async () => {
-  try {
-    console.log('Rejestrowanie komend...');
+client.once('clientReady', () => {
+  (async () => {
+    try {
+      console.log('Rejestrowanie komend...');
 
-    await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
+      await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
 
-    console.log('Komendy zarejestrowane!');
-  } catch (err) {
-    console.error('Błąd przy rejestracji komend:', err);
-  }
-})();
+      console.log('Komendy zarejestrowane!');
+    } catch (err) {
+      console.error('Błąd przy rejestracji komend:', err);
+    }
+  })();
+})
 
 client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
