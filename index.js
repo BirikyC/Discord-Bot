@@ -36,11 +36,11 @@ function write_counter(count) {
 let counter = read_counter();
 
 client.once('ready', () => {
-  console.log(`✅ Zalogowano jako ${client.user.tag}!`);
+  console.log(`Zalogowano jako ${client.user.tag}!`);
 
   const channel = client.channels.cache.get(CHANNEL_ID);
   if (!channel) {
-    console.error('❌ Nie znaleziono kanału! Sprawdź ID.');
+    console.error('Nie znaleziono kanału! Sprawdź ID.');
     return;
   }
 
