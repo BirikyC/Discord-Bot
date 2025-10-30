@@ -93,6 +93,46 @@ client.once('clientReady', () => {
 client.login(TOKEN);
 
 /* 
+********************************* FILTROWANIE WIADOMOŚCI *********************************
+*/
+
+const WORDS_TO_FILTER = fs.readFileSync('./filter/szuszek_filter_words.txt', 'utf-8')
+    .split('\n')
+    .map(word => word.trim().toLocaleLowerCase())
+    .filter(Boolean);
+const RESPONSES_TO_FILTERED = fs.readFileSync('./filter/szuszek_filter_response.txt', 'utf-8')
+    .split('\n')
+    .filter(Boolean);
+
+client.on('messageCreate', async (msg) => {
+  if(msg.author.bot) return;
+
+  const content = msg.content.toLocaleLowerCase();
+
+  // Upewnic sie ze w wiadomosci zawarta jest wiadomosc "szuszek"
+  const SZUSZEKS_TO_BE_FOUND = ["szuszek", "szuszke", "szyszka", "szuszu"];
+  if(!SZUSZEKS_TO_BE_FOUND.find(word => content.includes(word))) return;
+
+  const found_word = WORDS_TO_FILTER.find(word => content.includes(word));
+
+  if(found_word){
+    try{
+      // 1/20 (5%) szans na wysłanie odpowiedzi
+      let rand = Math.floor(Math.random() * 20);
+      if(rand != 1) return;
+
+      rand = Math.floor(Math.random() * RESPONSES_TO_FILTERED.length);
+      const response = RESPONSES_TO_FILTERED[rand];
+
+      await msg.channel.send(response);
+    }
+    catch (err){
+      console.log("Error: ", err);
+    }
+  }
+})
+
+/* 
 ********************************* PONIŻEJ SKRYPT Z KOMENDAMI DLA BOTA *********************************
 */
 
