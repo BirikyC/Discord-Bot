@@ -205,7 +205,7 @@ client.on('interactionCreate', async interaction => {
 
   const existing_connection = getVoiceConnection(interaction.guild.id);
   if(existing_connection){
-    const current_channel_id = existing_connection.channel.id;
+    const current_channel_id = existing_connection.joinConfig.channelId;
 
     if(current_channel_id !== voice_channel.id){
       await interaction.reply(":x: Bot już gra muzykę na innym kanale głosowym!");
@@ -256,7 +256,7 @@ client.on('interactionCreate', async interaction => {
   }
 
   guild_queue.queue.push({
-    path: selected_music.src,
+    path: music_path,
     name: selected_music.name
   });
 
