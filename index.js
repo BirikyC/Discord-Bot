@@ -191,76 +191,122 @@ client.on('interactionCreate', async interaction => {
 ********************************* KOMENDA: PLAY *********************************
 */
 
+const music_queue = new Map();
+
 client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
+  if (interaction.commandName !== 'play') return;
 
-  if (interaction.commandName === 'play') {
-    const voice_channel = interaction.member?.voice?.channel;
+  const voice_channel = interaction.member?.voice?.channel;
+  if(!voice_channel){
+    await interaction.reply(":x: Musisz być na kanale głosowym!");
+    return;
+  }
 
-    if(!voice_channel){
-      await interaction.reply(":x: Musisz być na kanale głosowym!");
+  const existing_connection = getVoiceConnection(interaction.guild.id);
+  if(existing_connection){
+    const current_channel_id = existing_connection.channel.id;
+
+    if(current_channel_id !== voice_channel.id){
+      await interaction.reply(":x: Bot już gra muzykę na innym kanale głosowym!");
       return;
     }
+  }
 
-    const existing_connection = getVoiceConnection(interaction.guild.id);
-    if(existing_connection){
-      const current_channel_id = existing_connection.channel.id;
+  let music_data;
+  try{
+    const data = fs.readFileSync('data/music.json', 'utf-8');
+    music_data = JSON.parse(data).music;
+  }
+  catch(error){
+    console.error("Błąd podczas wczytywania pliku music.json: ", error);
+    return;
+  }
 
-      if(current_channel_id !== voice_channel.id){
-        await interaction.reply(":x: Bot już gra muzykę na innym kanale głosowym!");
-        return;
-      }
+  const id = interaction.options.getInteger('id');
+  let selected_music;
 
-      await interaction.reply(":warning: Muzyka już gra! Poczekaj aż się skończy albo zatrzymaj bota.");
+  if(id === null || id === undefined){
+    selected_music = music_data[Math.floor(Math.random() * music_data.length)];
+  }
+  else{
+    selected_music = music_data.find(music => music.id === id)
+
+    if(!selected_music){
+      await interaction.reply(`Nie znaleziono pliku o id: ${id}. Dostępne wartości id są od 0 do ${music_data.length - 1}`);
       return;
     }
+  }
 
-    const MUSIC_PATH = "./music";
-    const files = fs.readdirSync(MUSIC_PATH).filter(file => file.endsWith(".mp3"));
+  const music_path = path.resolve(selected_music.src);
+  if(!fs.existsSync(music_path)){
+    console.error(`Nie znaleziono pliku o ścieżce: ${music_path}`);
+    return;
+  }
 
-    if(files.length <= 0){
-      console.error(`Folder o ścieżke ${MUSIC_PATH} nie zawiera plikow .mp3`);
-      return;
+  let guild_queue = music_queue.get(interaction.guild.id);
+  if(!guild_queue){
+    guild_queue = {
+      queue: [],
+      player: createAudioPlayer(),
+      connection: null,
+      isPlaying: false
+    };
+    music_queue.set(interaction.guild.id, guild_queue);
+  }
+
+  guild_queue.queue.push({
+    path: selected_music.src,
+    name: selected_music.name
+  });
+
+  await interaction.reply(`Dodano do kolejki: ${selected_music.name}`);
+
+  if(!guild_queue.isPlaying){
+    play_next_music(interaction.guild.id, voice_channel);
+  }
+});
+
+function play_next_music(guild_id, voice_channel){
+  const guild_queue = music_queue.get(guild_id);
+  if(!guild_queue) return;
+
+  const next_music = guild_queue.queue.shift();
+  if(!next_music){
+    // Kolejka pusta, a wiec rozlacz
+    if(guild_queue.connection){
+      guild_queue.connection.destroy();
     }
 
-    const id = interaction.options.getInteger('id');
-    let music_file_path;
+    music_queue.delete(guild_id);
+    return;
+  }
 
-    if(id == null || id == undefined){
-      const random_file = files[Math.floor(Math.random() * files.length)];
-      music_file_path = path.join(MUSIC_PATH, random_file)
-    }
-    else{
-      music_file_path = path.join(MUSIC_PATH, `${id}.mp3`);
-
-      if(!fs.existsSync(music_file_path)){
-        await interaction.reply(`Nie znaleziono pliku o id: ${id}. Aktualna ilość plików muzycznych wynosi: ${files.length}`);
-        return;
-      }
-    }
-
-    const connection = joinVoiceChannel({
+  if(!guild_queue.connection){
+    guild_queue.connection = joinVoiceChannel({
       channelId: voice_channel.id,
       guildId: voice_channel.guild.id,
       adapterCreator: voice_channel.guild.voiceAdapterCreator,
       selfDeaf: false,
       selfMute: false
     });
-
-    const player = createAudioPlayer();
-    const resource = createAudioResource(music_file_path);
-    player.play(resource);
-    connection.subscribe(player);
-
-    await interaction.reply(`Ale to będzie banglać :moai:`);
-
-    player.on(AudioPlayerStatus.Idle, () => {
-      connection.destroy();
-    })
-
-    player.on('error', error => {
-      console.error("Błąd podczas odtwarzania muzyki: ", error);
-      connection.destroy();
-    })
   }
-});
+
+  const resource = createAudioResource(next_music.path);
+  guild_queue.player.play(resource);
+  guild_queue.connection.subscribe(guild_queue.player);
+  guild_queue.isPlaying = true;
+
+  console.log(`Odtwarzanie: ${next_music.name}`);
+
+  guild_queue.player.on(AudioPlayerStatus.Idle, () => {
+    guild_queue.isPlaying = false;
+    play_next_music(guild_id, voice_channel);
+  });
+
+  guild_queue.player.on('error', (error) => {
+    console.error("Blad podczas odtwarzania muzyki: ", error);
+    guild_queue.isPlaying = false;
+    play_next_music(guild_id, voice_channel);
+  });
+}

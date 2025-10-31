@@ -1,0 +1,19 @@
+{
+    "music": [
+        {
+            "id": 0,
+            "src": "music/krzycze_glosno.mp3",
+            "name": "Krzyczę Głośno"
+        },
+        {
+            "id": 1,
+            "src": "music/piosenka_dla_szuszka.mp3",
+            "name": "Piosenka dla Szuszka"
+        },
+        {
+            "id": 2,
+            "src": "music/sklej_te_pizde.mp3",
+            "name": "Sklej te Pizde"
+        }
+    ]
+}
