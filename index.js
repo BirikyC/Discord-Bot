@@ -169,17 +169,23 @@ const commands = [
     ),
   new SlashCommandBuilder()
     .setName('skip')
-    .setDescription('Pomiń aktualnie grający utwór.')
+    .setDescription('Pomiń aktualnie grający utwór.'),
+  new SlashCommandBuilder()
+    .setName('stop')
+    .setDescription('Usuń całą kolejkę i rozłącz bota.')
 ].map(cmd => cmd.toJSON());
 
-/* 
-********************************* KOMENDA: GYATT *********************************
-*/
+const music_queue = new Map();
 
 client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
 
-  if (interaction.commandName === 'gyatt') {
+  const { commandName } = interaction;
+
+  /* 
+  ********************************* KOMENDA: GYATT *********************************
+  */
+  if(commandName === "gyatt"){
     const GIFS_PATH = './img/gyatts';
 
     const gifs = fs.readdirSync(GIFS_PATH).filter(file => file.endsWith('.gif'));
@@ -199,124 +205,166 @@ client.on('interactionCreate', async interaction => {
       files: [attachment]
     });
   }
-});
-
-/* 
-********************************* KOMENDA: PLAY *********************************
-*/
-
-const music_queue = new Map();
-
-client.on('interactionCreate', async interaction => {
-  if (!interaction.isChatInputCommand()) return;
-  if (interaction.commandName !== 'play') return;
-
-  const voice_channel = interaction.member?.voice?.channel;
-  if(!voice_channel){
-    await interaction.reply(":x: Musisz być na kanale głosowym!");
-    return;
-  }
-
-  const existing_connection = getVoiceConnection(interaction.guild.id);
-  let guild_queue = music_queue.get(interaction.guild.id);
-
-  if(existing_connection && guild_queue?.isPlaying){
-    const current_channel_id = existing_connection.joinConfig.channelId;
-
-    if(current_channel_id !== voice_channel.id){
-      await interaction.reply(":x: Bot już gra muzykę na innym kanale głosowym!");
-      return;
-    }
-  }
-
-  let music_data;
-  try{
-    const data = fs.readFileSync('data/music.json', 'utf-8');
-    music_data = JSON.parse(data).music;
-  }
-  catch(error){
-    console.error("Błąd podczas wczytywania pliku music.json: ", error);
-    return;
-  }
-
-  const id = interaction.options.getInteger('id');
-  const all_option = interaction.options.getString('all');
-
-  let tracks_to_add = [];
-
-  // -------------- TRYB /play all lub /play all random --------------
-  if(all_option){
+  /* 
+  ********************************* KOMENDA: PLAY *********************************
+  */
+  else if(commandName === "play"){
     await interaction.deferReply();
 
-    tracks_to_add = [...music_data];
-
-    if(all_option === 'random'){
-      tracks_to_add.sort(() => Math.random() - 0.5);
-    }
-
-    await interaction.editReply(`Dodano wszyszystkie (${tracks_to_add.length}) dostępne utwory ${all_option === 'random' ? "w losowej kolejności " : ""}do kolejki.`)
-  }
-  // -------------- TRYB /play id --------------
-  else if(id !== null && id !== undefined){
-    const selected_music = music_data.find(m => m.id === id);
-    if (!selected_music) {
-      await interaction.reply(`Nie znaleziono pliku o id ${id}. Dostępne wartości id są od 0 do ${music_data.length - 1}.`);
+    const voice_channel = interaction.member?.voice?.channel;
+    if(!voice_channel){
+      await interaction.editReply(":x: Musisz być na kanale głosowym!");
       return;
     }
 
-    tracks_to_add.push(selected_music);
-    await interaction.reply(`Dodano do kolejki: ${selected_music.name} :moai:`);
-  }
-  // -------------- TRYB /play (bez argumentow) --------------
-  else{
-    const selected_music = music_data[Math.floor(Math.random() * music_data.length)];
-    tracks_to_add.push(selected_music);
-    await interaction.reply(`Dodano do kolejki: ${selected_music.name} :moai:`);
-  }
+    const existing_connection = getVoiceConnection(interaction.guild.id);
+    let guild_queue = music_queue.get(interaction.guild.id);
 
-  if(!guild_queue){
-    guild_queue = {
-      queue: [],
-      player: createAudioPlayer(),
-      connection: null,
-      isPlaying: false
-    };
-    music_queue.set(interaction.guild.id, guild_queue);
+    if(existing_connection && guild_queue?.isPlaying){
+      const current_channel_id = existing_connection.joinConfig.channelId;
 
-    guild_queue.player.on(AudioPlayerStatus.Idle, () => {
-      guild_queue.isPlaying = false;
-      play_next_music(interaction.guild.id, voice_channel);
-    });
+      if(current_channel_id !== voice_channel.id){
+        await interaction.editReply(":x: Bot już gra muzykę na innym kanale głosowym!");
+        return;
+      }
+    }
 
-    guild_queue.player.on('error', (error) => {
-      console.error("Blad podczas odtwarzania muzyki: ", error);
-      guild_queue.isPlaying = false;
-      play_next_music(interaction.guild.id, voice_channel);
-    });
-  }
+    let music_data;
+    try{
+      const data = fs.readFileSync('data/music.json', 'utf-8');
+      music_data = JSON.parse(data).music;
+    }
+    catch(error){
+      console.error("Błąd podczas wczytywania pliku music.json: ", error);
+      return;
+    }
 
-  for (const track of tracks_to_add) {
-    const track_path = path.resolve(track.src);
-    if (fs.existsSync(track_path)) {
-      guild_queue.queue.push({
-        path: track_path,
-        name: track.name
+    const id = interaction.options.getInteger('id');
+    const all_option = interaction.options.getString('all');
+
+    let tracks_to_add = [];
+
+    // -------------- TRYB /play all lub /play all random --------------
+    if(all_option){
+      tracks_to_add = [...music_data];
+
+      if(all_option === 'random'){
+        tracks_to_add.sort(() => Math.random() - 0.5);
+      }
+
+      await interaction.editReply(`Dodano wszystkie (${tracks_to_add.length}) dostępne utwory ${all_option === 'random' ? "w losowej kolejności " : ""}do kolejki.`)
+    }
+    // -------------- TRYB /play id --------------
+    else if(id !== null && id !== undefined){
+      const selected_music = music_data.find(m => m.id === id);
+      if (!selected_music) {
+        await interaction.editReply(`Nie znaleziono pliku o id ${id}. Dostępne wartości id są od 0 do ${music_data.length - 1}.`);
+        return;
+      }
+
+      tracks_to_add.push(selected_music);
+      await interaction.editReply(`Dodano do kolejki: ${selected_music.name} :moai:`);
+    }
+    // -------------- TRYB /play (bez argumentow) --------------
+    else{
+      const selected_music = music_data[Math.floor(Math.random() * music_data.length)];
+      tracks_to_add.push(selected_music);
+      await interaction.editReply(`Dodano do kolejki: ${selected_music.name} :moai:`);
+    }
+
+    if(!guild_queue){
+      guild_queue = {
+        queue: [],
+        player: createAudioPlayer(),
+        connection: null,
+        isPlaying: false
+      };
+      music_queue.set(interaction.guild.id, guild_queue);
+
+      guild_queue.player.on(AudioPlayerStatus.Idle, () => {
+        guild_queue.isPlaying = false;
+        play_next_music(interaction.guild.id, voice_channel);
       });
-    } else {
-      console.error(`Nie znaleziono pliku: ${track.src}`);
+
+      guild_queue.player.on('error', (error) => {
+        console.error("Blad podczas odtwarzania muzyki: ", error);
+        guild_queue.isPlaying = false;
+        play_next_music(interaction.guild.id, voice_channel);
+      });
+    }
+
+    for (const track of tracks_to_add) {
+      const track_path = path.resolve(track.src);
+      if (fs.existsSync(track_path)) {
+        guild_queue.queue.push({
+          path: track_path,
+          name: track.name
+        });
+      } else {
+        console.error(`Nie znaleziono pliku: ${track.src}`);
+      }
+    }
+
+    if(!guild_queue.isPlaying){
+      play_next_music(interaction.guild.id, voice_channel);
     }
   }
+  /* 
+  ********************************* KOMENDA: SKIP *********************************
+  */
+  else if(commandName === "skip"){
+    const guild_queue = music_queue.get(interaction.guild.id);
+    if(!guild_queue){
+      await interaction.reply("Aktualnie nie gra żaden utwór :japanese_goblin:");
+      return;
+    }
 
-  if(!guild_queue.isPlaying){
-    play_next_music(interaction.guild.id, voice_channel);
+    const existing_connection = getVoiceConnection(interaction.guild.id);
+    if(!existing_connection){
+      await interaction.reply("Bot nie jest na żadnym kanale głosowym.");
+      return;
+    }
+
+    const voice_channel = interaction.guild.channels.cache.get(existing_connection.joinConfig.channelId);
+
+    if(!voice_channel){
+      await interaction.reply("Nie udało się znaleźć kanału głosowego.");
+      return;
+    }
+
+    guild_queue.player.stop();
+
+    await interaction.reply("f");
   }
-});
+  /* 
+  ********************************* KOMENDA: STOP *********************************
+  */
+  else if(commandName === "stop"){
+    const guild_queue = music_queue.get(interaction.guild.id);
+    if(!guild_queue){
+      await interaction.reply("Aktualnie nie gra żaden utwór :japanese_goblin:");
+      return;
+    }
+
+    const existing_connection = getVoiceConnection(interaction.guild.id);
+    if(!existing_connection){
+      await interaction.reply("Bot nie jest na żadnym kanale głosowym.");
+      return;
+    }
+
+    guild_queue.player.stop();
+    guild_queue.queue = [];
+
+    guild_queue.connection.destroy();
+    music_queue.delete(interaction.guild.id);
+
+    await interaction.reply("Dobra to wypierdalam w takim razie :triumph:");
+  }
+})
 
 function play_next_music(guild_id, voice_channel){
   const guild_queue = music_queue.get(guild_id);
   if(!guild_queue) return;
-
-  console.log(guild_queue.queue);
 
   if (!guild_queue.queue.length) {
     console.log(`Kolejka zakończona. Następuje rozłączenie z kanałem: ${voice_channel.name}.`);
@@ -353,36 +401,3 @@ function play_next_music(guild_id, voice_channel){
 
   console.log(`Odtwarzanie: ${next_music.name}`);
 }
-
-/* 
-********************************* KOMENDA: SKIP *********************************
-*/
-
-client.on('interactionCreate', async interaction => {
-  if (!interaction.isChatInputCommand()) return;
-  if (interaction.commandName !== 'skip') return;
-
-  const guild_queue = music_queue.get(interaction.guild.id);
-  if(!guild_queue){
-    await interaction.reply("Aktualnie nie gra żaden utwór :japanese_goblin:");
-    return;
-  }
-
-  const existing_connection = getVoiceConnection(interaction.guild.id);
-
-  if(!existing_connection){
-    await interaction.reply("Bot nie jest na żadnym kanale głosowym.");
-    return;
-  }
-
-  const voice_channel = interaction.guild.channels.cache.get(existing_connection.joinConfig.channelId);
-
-  if(!voice_channel){
-    await interaction.reply("Nie udało się znaleźć kanału głosowego.");
-    return;
-  }
-
-  guild_queue.player.stop();
-
-  await interaction.reply("Utwór został pominięty.");
-});
