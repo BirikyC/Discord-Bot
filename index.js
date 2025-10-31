@@ -166,7 +166,10 @@ const commands = [
           { name: 'normal', value: 'normal' },
           { name: 'random', value: 'random' }
         )
-    )
+    ),
+  new SlashCommandBuilder()
+    .setName('skip')
+    .setDescription('Pomiń aktualnie grający utwór.')
 ].map(cmd => cmd.toJSON());
 
 /* 
@@ -243,13 +246,15 @@ client.on('interactionCreate', async interaction => {
 
   // -------------- TRYB /play all lub /play all random --------------
   if(all_option){
+    await interaction.deferReply();
+
     tracks_to_add = [...music_data];
 
     if(all_option === 'random'){
       tracks_to_add.sort(() => Math.random() - 0.5);
     }
 
-    await interaction.reply(`Dodano wszyszystkie (${tracks_to_add.length}) dostępne utwory ${all_option === 'random' ? "w losowej kolejności " : ""}do kolejki.`)
+    await interaction.editReply(`Dodano wszyszystkie (${tracks_to_add.length}) dostępne utwory ${all_option === 'random' ? "w losowej kolejności " : ""}do kolejki.`)
   }
   // -------------- TRYB /play id --------------
   else if(id !== null && id !== undefined){
@@ -348,3 +353,36 @@ function play_next_music(guild_id, voice_channel){
 
   console.log(`Odtwarzanie: ${next_music.name}`);
 }
+
+/* 
+********************************* KOMENDA: SKIP *********************************
+*/
+
+client.on('interactionCreate', async interaction => {
+  if (!interaction.isChatInputCommand()) return;
+  if (interaction.commandName !== 'skip') return;
+
+  const guild_queue = music_queue.get(interaction.guild.id);
+  if(!guild_queue){
+    await interaction.reply("Aktualnie nie gra żaden utwór :japanese_goblin:");
+    return;
+  }
+
+  const existing_connection = getVoiceConnection(interaction.guild.id);
+
+  if(!existing_connection){
+    await interaction.reply("Bot nie jest na żadnym kanale głosowym.");
+    return;
+  }
+
+  const voice_channel = interaction.guild.channels.cache.get(existing_connection.joinConfig.channelId);
+
+  if(!voice_channel){
+    await interaction.reply("Nie udało się znaleźć kanału głosowego.");
+    return;
+  }
+
+  guild_queue.player.stop();
+
+  await interaction.reply("Utwór został pominięty.");
+});
