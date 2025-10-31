@@ -11,7 +11,12 @@ app.get('/', (req, res) => res.send('Bot działa!'));
 app.listen(PORT, () => console.log(`Server nasłuchuje na porcie ${PORT}`));
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent]
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildVoiceStates
+  ]
 });
 
 const TOKEN = process.env.TOKEN;
@@ -137,12 +142,25 @@ client.on('messageCreate', async (msg) => {
 */
 
 const { REST, Routes, SlashCommandBuilder, AttachmentBuilder } = require('discord.js');
+const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, getVoiceConnection } = require('@discordjs/voice');
 
 const commands = [
   new SlashCommandBuilder()
     .setName('gyatt')
-    .setDescription('Szuszek ale on ma gyatt 🗿.')
+    .setDescription('Szuszek ale on ma gyatt 🗿.'),
+  new SlashCommandBuilder()
+    .setName('play')
+    .setDescription('Odpal fajna muzyke na kanale glosowym')
+    .addIntegerOption(option => 
+      option.setName('id')
+        .setDescription('ID utworu')
+        .setRequired(false)
+    )
 ].map(cmd => cmd.toJSON());
+
+/* 
+********************************* KOMENDA: GYATT *********************************
+*/
 
 client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
@@ -166,5 +184,70 @@ client.on('interactionCreate', async interaction => {
       content: `Szuszek ale on ma Gyatt.`,
       files: [attachment]
     });
+  }
+});
+
+/* 
+********************************* KOMENDA: PLAY *********************************
+*/
+
+client.on('interactionCreate', async interaction => {
+  if (!interaction.isChatInputCommand()) return;
+
+  if (interaction.commandName === 'play') {
+    const voice_channel = interaction.member?.voice?.channel;
+
+    if(!voice_channel){
+      await interaction.reply(":x: Musisz być na kanale głosowym!");
+      return;
+    }
+
+    const MUSIC_PATH = "./music";
+    const files = fs.readdirSync(MUSIC_PATH).filter(file => file.endsWith(".mp3"));
+
+    if(files.length <= 0){
+      console.error(`Folder o ścieżke ${MUSIC_PATH} nie zawiera plikow .mp3`);
+      return;
+    }
+
+    const id = interaction.options.getInteger('id');
+    let music_file_path;
+
+    if(id == null || id == undefined){
+      const random_file = files[Math.floor(Math.random() * files.length)];
+      music_file_path = path.join(MUSIC_PATH, random_file)
+    }
+    else{
+      music_file_path = path.join(MUSIC_PATH, `${id}.mp3`);
+
+      if(!fs.existsSync(music_file_path)){
+        await interaction.reply(`Nie znaleziono pliku o id: ${id}. Aktualna ilość plików muzycznych wynosi: ${files.length}`);
+        return;
+      }
+    }
+
+    const connection = joinVoiceChannel({
+      channelId: voice_channel.id,
+      guildId: voice_channel.guild.id,
+      adapterCreator: voice_channel.guild.voiceAdapterCreator,
+      selfDeaf: false,
+      selfMute: false
+    });
+
+    const player = createAudioPlayer();
+    const resource = createAudioResource(music_file_path);
+    player.play(resource);
+    connection.subscribe(player);
+
+    await interaction.reply(`Ale to będzie banglać :moai:`);
+
+    player.on(AudioPlayerStatus.Idle, () => {
+      connection.destroy();
+    })
+
+    player.on('error', error => {
+      console.error("Błąd podczas odtwarzania muzyki: ", error);
+      connection.destroy();
+    })
   }
 });
