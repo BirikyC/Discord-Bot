@@ -37,7 +37,7 @@ function read_counter() {
 }
 
 function write_counter(count) {
-  fs.writeFileSync('counter.json', JSON.stringify({ count }));
+  fs.writeFileSync('data/counter.json', JSON.stringify({ count }));
 }
 
 let counter = read_counter();
