@@ -191,7 +191,7 @@ client.on('interactionCreate', async interaction => {
     const gifs = fs.readdirSync(GIFS_PATH).filter(file => file.endsWith('.gif'));
 
     if (gifs.length === 0) {
-      await interaction.reply('Brak plików GIF w folderze!');
+      await safe_reply(interaction, 'Brak plików GIF w folderze!');
       return;
     }
 
@@ -200,20 +200,23 @@ client.on('interactionCreate', async interaction => {
 
     const attachment = new AttachmentBuilder(gif_path);
 
-    await interaction.reply({
-      content: `Szuszek ale on ma Gyatt.`,
-      files: [attachment]
-    });
+    await safe_reply(interaction, 'Szuszek ale on ma Gyatt', { files: [attachment] })
   }
   /* 
   ********************************* KOMENDA: PLAY *********************************
   */
   else if(commandName === "play"){
-    await interaction.deferReply();
+    try {
+      if (!interaction.deferred && !interaction.replied) {
+        await interaction.deferReply();
+      }
+    } catch (err) {
+      console.error("Nie udało się deferować odpowiedzi:", err);
+    }
 
     const voice_channel = interaction.member?.voice?.channel;
     if(!voice_channel){
-      await interaction.editReply(":x: Musisz być na kanale głosowym!");
+      await safe_reply(interaction, ":x: Musisz być na kanale głosowym!");
       return;
     }
 
@@ -224,7 +227,7 @@ client.on('interactionCreate', async interaction => {
       const current_channel_id = existing_connection.joinConfig.channelId;
 
       if(current_channel_id !== voice_channel.id){
-        await interaction.editReply(":x: Bot już gra muzykę na innym kanale głosowym!");
+        await safe_reply(interaction, ":x: Bot już gra muzykę na innym kanale głosowym!");
         return;
       }
     }
@@ -236,6 +239,7 @@ client.on('interactionCreate', async interaction => {
     }
     catch(error){
       console.error("Błąd podczas wczytywania pliku music.json: ", error);
+      await safe_reply(interaction, "Blad podczas wczytywania pliku music.json.");
       return;
     }
 
@@ -252,24 +256,24 @@ client.on('interactionCreate', async interaction => {
         tracks_to_add.sort(() => Math.random() - 0.5);
       }
 
-      await interaction.editReply(`Dodano wszystkie (${tracks_to_add.length}) dostępne utwory ${all_option === 'random' ? "w losowej kolejności " : ""}do kolejki.`)
+      await safe_reply(interaction, `Dodano wszystkie (${tracks_to_add.length}) dostępne utwory ${all_option === 'random' ? "w losowej kolejności " : ""}do kolejki.`)
     }
     // -------------- TRYB /play id --------------
     else if(id !== null && id !== undefined){
       const selected_music = music_data.find(m => m.id === id);
       if (!selected_music) {
-        await interaction.editReply(`Nie znaleziono pliku o id ${id}. Dostępne wartości id są od 0 do ${music_data.length - 1}.`);
+        await safe_reply(interaction, `Nie znaleziono pliku o id ${id}. Dostępne wartości id są od 0 do ${music_data.length - 1}.`);
         return;
       }
 
       tracks_to_add.push(selected_music);
-      await interaction.editReply(`Dodano do kolejki: ${selected_music.name} :moai:`);
+      await safe_reply(interaction, `Dodano do kolejki: ${selected_music.name} :moai:`);
     }
     // -------------- TRYB /play (bez argumentow) --------------
     else{
       const selected_music = music_data[Math.floor(Math.random() * music_data.length)];
       tracks_to_add.push(selected_music);
-      await interaction.editReply(`Dodano do kolejki: ${selected_music.name} :moai:`);
+      await safe_reply(interaction, `Dodano do kolejki: ${selected_music.name} :moai:`);
     }
 
     if(!guild_queue){
@@ -315,26 +319,26 @@ client.on('interactionCreate', async interaction => {
   else if(commandName === "skip"){
     const guild_queue = music_queue.get(interaction.guild.id);
     if(!guild_queue){
-      await interaction.reply("Aktualnie nie gra żaden utwór :japanese_goblin:");
+      await safe_reply(interaction, "Aktualnie nie gra żaden utwór :japanese_goblin:");
       return;
     }
 
     const existing_connection = getVoiceConnection(interaction.guild.id);
     if(!existing_connection){
-      await interaction.reply("Bot nie jest na żadnym kanale głosowym.");
+      await safe_reply(interaction, "Bot nie jest na żadnym kanale głosowym.");
       return;
     }
 
     const voice_channel = interaction.guild.channels.cache.get(existing_connection.joinConfig.channelId);
 
     if(!voice_channel){
-      await interaction.reply("Nie udało się znaleźć kanału głosowego.");
+      await safe_reply(interaction, "Nie udało się znaleźć kanału głosowego.");
       return;
     }
 
     guild_queue.player.stop();
 
-    await interaction.reply("f");
+    await safe_reply(interaction, "f");
   }
   /* 
   ********************************* KOMENDA: STOP *********************************
@@ -342,13 +346,13 @@ client.on('interactionCreate', async interaction => {
   else if(commandName === "stop"){
     const guild_queue = music_queue.get(interaction.guild.id);
     if(!guild_queue){
-      await interaction.reply("Aktualnie nie gra żaden utwór :japanese_goblin:");
+      await safe_reply(interaction, "Aktualnie nie gra żaden utwór :japanese_goblin:");
       return;
     }
 
     const existing_connection = getVoiceConnection(interaction.guild.id);
     if(!existing_connection){
-      await interaction.reply("Bot nie jest na żadnym kanale głosowym.");
+      await safe_reply(interaction, "Bot nie jest na żadnym kanale głosowym.");
       return;
     }
 
@@ -358,7 +362,7 @@ client.on('interactionCreate', async interaction => {
     guild_queue.connection.destroy();
     music_queue.delete(interaction.guild.id);
 
-    await interaction.reply("Dobra to wypierdalam w takim razie :triumph:");
+    await safe_reply(interaction, "Dobra to wypierdalam w takim razie :triumph:");
   }
 })
 
@@ -400,4 +404,27 @@ function play_next_music(guild_id, voice_channel){
   guild_queue.isPlaying = true;
 
   console.log(`Odtwarzanie: ${next_music.name}`);
+}
+
+async function safe_reply(interaction, content, options = {}) {
+  try {
+    if (interaction.replied) {
+      return await interaction.followUp({ content, ...options });
+    } else if (interaction.deferred) {
+      return await interaction.editReply({ content, ...options });
+    } else {
+      return await interaction.reply({ content, ...options });
+    }
+  } catch (err) {
+    if (err?.code === 10062) {
+      console.warn("Unknown interaction (10062) - token wygasł, próbuję followUp.");
+      try {
+        await interaction.followUp({ content, ...options });
+      } catch (err2) {
+        console.error("FollowUp też się nie udał:", err2);
+      }
+    } else {
+      console.error("Błąd podczas odpowiedzi interakcji:", err);
+    }
+  }
 }
