@@ -1,4 +1,5 @@
 const { Client, GatewayIntentBits } = require('discord.js');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
@@ -28,6 +29,7 @@ const SPECIAL_MESSAGE = 'Szuszek ale on ma Gyatt.';
 const INTERVAL = 60 * 60 * 1000; // co godzine
 
 const COUNTER_FILE_PATH = "data/counter.json";
+const MUSIC_FILE_PATH = "data/music.json";
 
 function read_counter() {
   try {
@@ -172,7 +174,10 @@ const commands = [
     .setDescription('Pomiń aktualnie grający utwór.'),
   new SlashCommandBuilder()
     .setName('stop')
-    .setDescription('Usuń całą kolejkę i rozłącz bota.')
+    .setDescription('Usuń całą kolejkę i rozłącz bota.'),
+  new SlashCommandBuilder()
+    .setName('list')
+    .setDescription("Wyświetl listę dostępnych utworów.")
 ].map(cmd => cmd.toJSON());
 
 const music_queue = new Map();
@@ -234,12 +239,12 @@ client.on('interactionCreate', async interaction => {
 
     let music_data;
     try{
-      const data = fs.readFileSync('data/music.json', 'utf-8');
+      const data = fs.readFileSync(MUSIC_FILE_PATH, 'utf-8');
       music_data = JSON.parse(data).music;
     }
     catch(error){
-      console.error("Błąd podczas wczytywania pliku music.json: ", error);
-      await safe_reply(interaction, "Blad podczas wczytywania pliku music.json.");
+      console.error(`Błąd podczas wczytywania pliku ${MUSIC_FILE_PATH}: `, error);
+      await safe_reply(interaction, `Blad podczas wczytywania pliku ${MUSIC_FILE_PATH}.`);
       return;
     }
 
@@ -363,6 +368,103 @@ client.on('interactionCreate', async interaction => {
     music_queue.delete(interaction.guild.id);
 
     await safe_reply(interaction, "Dobra to wypierdalam w takim razie :triumph:");
+  }
+  /* 
+  ********************************* KOMENDA: STOP *********************************
+  */
+  else if(commandName === "list"){
+    try{
+      const data = fs.readFileSync(MUSIC_FILE_PATH, 'utf-8');
+      const music_data = JSON.parse(data).music;
+
+      if(!music_data || music_data.length === 0){
+        console.log(`Plik: "${MUSIC_FILE_PATH}" jest pusty.`);
+        await safe_reply(interaction, "Brak dostepnych utworow w pliku.");
+        return;
+      }
+
+      const ITEMS_PER_PAGE = 10;
+      let current_page = 0;
+      const total_pages = Math.ceil(music_data.length / ITEMS_PER_PAGE);
+
+      const generate_page_content = (page = 0) => {
+        const start = page * ITEMS_PER_PAGE;
+        const end = start + ITEMS_PER_PAGE;
+
+        const items = [];
+
+        for(let i = start; i < end; i++){
+          if(music_data[i] === null || music_data[i] === undefined) break;
+
+          items.push(music_data[i]);
+        }
+
+        const list = items.map(m => `${m.id}. ${m.name}`).join('\n');
+
+        return `**Lista utworów (strona ${page + 1}/${total_pages})** \n\n${list}`;
+      };
+
+      if(music_data.length <= ITEMS_PER_PAGE){
+        await safe_reply(interaction, generate_page_content());
+        return;
+      }
+
+      const getButtons = (page) => {
+        return new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId('prev')
+            .setLabel('⏮️')
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(page === 0),
+          new ButtonBuilder()
+            .setCustomId('next')
+            .setLabel('⏭️')
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(page === total_pages - 1)
+        );
+      };
+
+      const message = await safe_reply(interaction, generate_page_content(current_page), { components: [getButtons(current_page)] });
+
+      const collector = message.createMessageComponentCollector({
+        time: 5 * 60 * 1000 // 5 minut aktywnosci obslugi przyciskow
+      });
+
+      collector.on('collect', async (button_interaction) => {
+        if(button_interaction.user.id !== interaction.user.id){
+          await button_interaction.reply({ content: "Nie możesz używać cudzych przycisków! :japanese_ogre:", ephemeral: true });
+        
+          return;
+        }
+
+        if(button_interaction.customId === 'prev' && current_page > 0){
+          current_page--;
+        }
+        else if(button_interaction.customId === 'next' && current_page < total_pages - 1){
+          current_page++;
+        }
+
+        await button_interaction.update({
+          content: generate_page_content(current_page),
+          components: [getButtons(current_page)]
+        });
+      });
+
+      collector.on('end', async () => {
+        try{
+          await message.edit({
+            components: []
+          });
+        }
+        catch(error){
+          console.error("Nie udalo sie wyczyscic przyciskow po czasie: ", error);
+        }
+      });
+    }
+    catch(error){
+      console.error(`Błąd podczas wczytywania pliku ${MUSIC_FILE_PATH}: `, error);
+      await safe_reply(interaction, `Blad podczas wczytywania pliku ${MUSIC_FILE_PATH}.`);
+    }
   }
 })
 
