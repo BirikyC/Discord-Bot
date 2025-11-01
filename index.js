@@ -430,6 +430,11 @@ client.on('interactionCreate', async interaction => {
 
       const message = await safe_reply(interaction, generate_page_content(current_page), { components: [getButtons(current_page)] });
 
+      if(!message || !message.createMessageComponentCollector){
+        console.error("Brak message do utworzenia collectora.");
+        return;
+      }
+
       const collector = message.createMessageComponentCollector({
         time: 5 * 60 * 1000 // 5 minut aktywnosci obslugi przyciskow
       });
@@ -512,22 +517,27 @@ function play_next_music(guild_id, voice_channel){
   console.log(`Odtwarzanie: ${next_music.name}`);
 }
 
-async function safe_reply(interaction, content, options = {}) {
+async function safe_reply(interaction, content, options = {}){
+  const optWithFetch = { withResponse: true, ...options };
+
   try {
     if (interaction.replied) {
-      return await interaction.followUp({ content, ...options });
+      return await interaction.followUp({ content, ...optWithFetch });
     } else if (interaction.deferred) {
-      return await interaction.editReply({ content, ...options });
+      await interaction.editReply({ content, ...options });
+      return await interaction.fetchReply();
     } else {
-      return await interaction.reply({ content, ...options });
+      return await interaction.reply({ content, ...optWithFetch });
     }
   } catch (err) {
     if (err?.code === 10062 || err?.code === 40060) {
-      console.warn("Interakcja wygasła lub już została użyta, próbuję followUp...");
+      console.warn("Interakcja wygasła lub już została użyta, próbuję wysłać zwykłe message do kanału...");
       try {
-        await interaction.followUp({ content, ...options });
+        if (interaction.channel) {
+          return await interaction.channel.send({ content, ...options });
+        }
       } catch (err2) {
-        console.error("FollowUp też się nie udał:", err2);
+        console.error("Fallback channel.send też się nie udał:", err2);
       }
     } else {
       console.error("Błąd podczas odpowiedzi interakcji:", err);
