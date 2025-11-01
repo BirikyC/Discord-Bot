@@ -239,7 +239,7 @@ client.on('interactionCreate', async interaction => {
 
     let music_data;
     try{
-      const data = fs.readFileSync(MUSIC_FILE_PATH, 'utf-8');
+      const data = await fs.promises.readFile(MUSIC_FILE_PATH, 'utf-8');
       music_data = JSON.parse(data).music;
     }
     catch(error){
@@ -370,11 +370,15 @@ client.on('interactionCreate', async interaction => {
     await safe_reply(interaction, "Dobra to wypierdalam w takim razie :triumph:");
   }
   /* 
-  ********************************* KOMENDA: STOP *********************************
+  ********************************* KOMENDA: LIST *********************************
   */
   else if(commandName === "list"){
     try{
-      const data = fs.readFileSync(MUSIC_FILE_PATH, 'utf-8');
+      if (!interaction.deferred && !interaction.replied) {
+        await interaction.deferReply();
+      }
+
+      const data = await fs.promises.readFile(MUSIC_FILE_PATH, 'utf-8');
       const music_data = JSON.parse(data).music;
 
       if(!music_data || music_data.length === 0){
@@ -518,8 +522,8 @@ async function safe_reply(interaction, content, options = {}) {
       return await interaction.reply({ content, ...options });
     }
   } catch (err) {
-    if (err?.code === 10062) {
-      console.warn("Unknown interaction (10062) - token wygasł, próbuję followUp.");
+    if (err?.code === 10062 || err?.code === 40060) {
+      console.warn("Interakcja wygasła lub już została użyta, próbuję followUp...");
       try {
         await interaction.followUp({ content, ...options });
       } catch (err2) {
