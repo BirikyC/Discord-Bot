@@ -267,7 +267,7 @@ client.on('interactionCreate', async interaction => {
     else if(id !== null && id !== undefined){
       const selected_music = music_data.find(m => m.id === id);
       if (!selected_music) {
-        await safe_reply(interaction, `Nie znaleziono pliku o id ${id}. Dostępne wartości id są od 0 do ${music_data.length - 1}.`);
+        await safe_reply(interaction, `Nie znaleziono pliku o id ${id}. Dostępne wartości id są od 1 do ${music_data.length}.`);
         return;
       }
 
